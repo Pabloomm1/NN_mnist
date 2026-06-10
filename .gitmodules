@@ -1,0 +1,3 @@
+[submodule "datasets/mnist"]
+	path = datasets/mnist
+	url = https://huggingface.co/datasets/mnist
