@@ -2,8 +2,7 @@
 
 https://github.com/Pabloomm1/NN_mnist.git
 
-Нейронная сеть на чистом NumPy для распознавания рукописных цифр. Никаких PyTorch/TensorFlow — только матрицы и математика.
-
+Нейронная сеть для распознавания рукописных цифр. В ее реализации не использовалиь PyTorch/Tensorflow так что результат может быть не идеален.
 Архитектура: 784 → 128 (ReLU) → 64 (ReLU) → 10 (Softmax), обучение через mini-batch SGD с cross-entropy loss.
 
 ## Структура
@@ -25,6 +24,13 @@ git clone https://github.com/Pabloomm1/NN_mnist.git
 cd NN_mnist
 git submodule init
 git submodule update
+```
+
+Создать и активировать виртуальное окружение:
+
+```bash
+python3 -m venv venv
+source venv/bin/activate
 ```
 
 Установить зависимости:
