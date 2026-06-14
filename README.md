@@ -40,11 +40,6 @@ pip install -r requirements.txt
 pip install jupyterlab
 ```
 
-Tkinter нужен для GUI, на Ubuntu/Debian обычно не идёт из коробки:
-
-```bash
-sudo apt install python3-tk
-```
 
 ## Данные
 
