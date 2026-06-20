@@ -18,22 +18,22 @@ def load_parameter(filename, expected_shape=None):
 
 
 def load_weights_from_txt():
-    w1_flat = load_parameter("/home/pavel/work/notebook/Mnist3/parameters/W1.txt")
+    w1_flat = load_parameter("parameters/W1.txt")
     W1 = w1_flat.reshape(128, 784)
 
-    w2_flat = load_parameter("/home/pavel/work/notebook/Mnist3/parameters/W2.txt")
+    w2_flat = load_parameter("parameters/W2.txt")
     W2 = w2_flat.reshape(64, 128)
 
-    w3_flat = load_parameter("/home/pavel/work/notebook/Mnist3/parameters/W3.txt")
+    w3_flat = load_parameter("parameters/W3.txt")
     W3 = w3_flat.reshape(10, 64)
 
-    b1 = load_parameter("/home/pavel/work/notebook/Mnist3/parameters/b1.txt")
+    b1 = load_parameter("parameters/b1.txt")
     b1 = b1.reshape(128, 1)
 
-    b2 = load_parameter("/home/pavel/work/notebook/Mnist3/parameters/b2.txt")
+    b2 = load_parameter("parameters/b2.txt")
     b2 = b2.reshape(64, 1)
 
-    b3 = load_parameter("/home/pavel/work/notebook/Mnist3/parameters/b3.txt")
+    b3 = load_parameter("parameters/b3.txt")
     b3 = b3.reshape(10, 1)
 
     return W1, b1, W2, b2, W3, b3
@@ -65,20 +65,25 @@ def predict(W1, b1, W2, b2, W3, b3, X):
 
 def canvas_to_mnist(pil_image):
     img = pil_image.convert('L')
-    
-   
+
     bbox = img.getbbox()
     if bbox:
         img = img.crop(bbox)
-    
-   
+
     w, h = img.size
     pad = int(max(w, h) * 0.3)
     img = ImageOps.expand(img, border=pad, fill=0)
-    
-   
+
+    # Делаем квадратным перед resize
+    w, h = img.size
+    if w != h:
+        size = max(w, h)
+        new_img = Image.new('L', (size, size), 0)
+        new_img.paste(img, ((size - w) // 2, (size - h) // 2))
+        img = new_img
+
     img = img.resize((28, 28), Image.LANCZOS)
-    
+
     arr = np.array(img, dtype=np.float64) / 255.0
     return arr.reshape(784, 1)
 
@@ -103,11 +108,9 @@ class DrawApp:
     def _build_ui(self):
         pad = dict(padx=12, pady=8)
 
-       
         tk.Label(self.root, text="Нарисуй цифру", font=('Helvetica', 14, 'bold'),
                  bg='#1a1a1a', fg='#ffffff').grid(row=0, column=0, columnspan=2, pady=(16, 4))
 
-       
         self.tk_canvas = tk.Canvas(
             self.root, width=self.CANVAS_SIZE, height=self.CANVAS_SIZE,
             bg='black', cursor='crosshair', highlightthickness=1,
@@ -119,7 +122,6 @@ class DrawApp:
         self.last_x = None
         self.last_y = None
 
-      
         tk.Label(self.root, text="Предсказание:", font=('Helvetica', 11),
                  bg='#1a1a1a', fg='#888888').grid(row=1, column=1, sticky='sw', **pad)
 
@@ -131,7 +133,6 @@ class DrawApp:
         tk.Label(self.root, textvariable=self.conf_var, font=('Helvetica', 11),
                  bg='#1a1a1a', fg='#888888').grid(row=3, column=1, sticky='n', padx=12)
 
-        
         tk.Label(self.root, text="Вероятности:", font=('Helvetica', 10),
                  bg='#1a1a1a', fg='#888888').grid(row=4, column=1, sticky='sw', padx=12, pady=(8, 2))
 
@@ -153,9 +154,18 @@ class DrawApp:
             pct_lbl.pack(side='left')
             self.bar_widgets.append((track, bar, pct_lbl))
 
-       
+        # Превью 28x28
+        tk.Label(self.root, text="Превью 28×28:", font=('Helvetica', 10),
+                 bg='#1a1a1a', fg='#888888').grid(row=6, column=1, sticky='sw', padx=12, pady=(8, 2))
+
+        self.preview_canvas = tk.Canvas(
+            self.root, width=56, height=56, bg='black',
+            highlightthickness=1, highlightbackground='#444444'
+        )
+        self.preview_canvas.grid(row=7, column=1, sticky='nw', padx=12, pady=(0, 8))
+
         btn_frame = tk.Frame(self.root, bg='#1a1a1a')
-        btn_frame.grid(row=6, column=0, columnspan=2, pady=(4, 16))
+        btn_frame.grid(row=8, column=0, columnspan=2, pady=(4, 16))
 
         tk.Button(btn_frame, text='Очистить', command=self._clear,
                   font=('Helvetica', 11), bg='#2a2a2a', fg='#cccccc',
@@ -197,8 +207,31 @@ class DrawApp:
             track.coords(bar, 0, 0, 0, 8)
             track.itemconfig(bar, fill='#333333')
             pct_lbl.config(text='')
+        self.preview_canvas.delete('all')
+
+    def _is_canvas_empty(self):
+        arr = np.array(self.pil_image.convert('L'))
+        return np.max(arr) == 0
+
+    def _update_preview(self, X):
+        arr = (X.reshape(28, 28) * 255).astype(np.uint8)
+        img = Image.fromarray(arr, mode='L').resize((56, 56), Image.NEAREST)
+        self._preview_photo = ImageTk.PhotoImage(img)
+        self.preview_canvas.delete('all')
+        self.preview_canvas.create_image(0, 0, anchor='nw', image=self._preview_photo)
+
+    def _save_preview(self, X, predicted_digit):
+        arr = (X.reshape(28, 28) * 255).astype(np.uint8)
+        img = Image.fromarray(arr, mode='L')
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        filename = f"preview_{predicted_digit}_{timestamp}.png"
+        img.save(filename)
 
     def _predict(self):
+        if self._is_canvas_empty():
+            messagebox.showwarning("Холст пустой", "Нарисуй цифру перед предсказанием!")
+            return
+
         X = canvas_to_mnist(self.pil_image)
         _, _, _, _, _, A3 = forward_prop(
             self.W1, self.b1, self.W2, self.b2, self.W3, self.b3, X
@@ -216,6 +249,9 @@ class DrawApp:
             track.itemconfig(bar, fill=color)
             pct_lbl.config(text=f'{probs[i] * 100:.1f}%',
                            fg='#aaaaaa' if i == best else '#555555')
+
+        self._update_preview(X)
+        self._save_preview(X, best)
 
 
 def main():
